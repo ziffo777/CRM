@@ -1,0 +1,338 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "_artifactsLocation": {
+      "type": "string"
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring"
+    },
+    "storageType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "vmName": {
+      "defaultValue": "msalmcrm",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "adminUserName": {
+      "type": "string",
+      "defaultValue": "mnoskovic",
+      "minLength": 1
+    },
+    "adminPassword": {
+      "type": "securestring"
+    },
+
+    "vnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16"
+    },
+    "subnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/24"
+    },
+    "rdpPort": {
+      "type": "int",
+      "defaultValue": 443,
+      "metadata": {
+        "description": "Public port number for RDP"
+      }
+    },
+
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "storage account name for installation files"
+      }
+    },
+
+    "storageAccountKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "storage account key for accessing storage account"
+      }
+    },
+
+    "configuration": {
+      "type": "string",
+      "metadata": {
+        "description": "Configuration file content"
+      }
+    }
+  },
+  "variables": {
+
+    //"vmImagePublisher": "MicrosoftSQLServer",
+    //"vmImageOffer": "SQL2014SP1-WS2012R2",
+    //"vmImageSku": "Enterprise",
+
+    "vmImagePublisher": "MicrosoftWindowsServer",
+    "vmImageOffer": "WindowsServer",
+    "vmImageSku": "2012-R2-Datacenter",
+
+    "vmName": "[concat(parameters('vmName'))]",
+
+    "vmOSDiskName": "[concat(parameters('vmName'))]",
+    "vmVmSize": "Standard_A2",
+    "vmStorageAccountContainerName": "vhds",
+
+    "publicIpName": "[concat(parameters('vmName'),'-pip')]",
+    "loadbalancerName": "[concat(parameters('vmName'),'-lb')]",
+    "vnetName": "[concat(parameters('vmName'),'-vnet')]",
+    "nicName": "[concat(parameters('vmName'),'-nic')]"
+
+  },
+  "resources": [
+    {
+      "name": "[toLower(concat(parameters('vmName')))]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "properties": {
+        "accountType": "[parameters('storageType')]"
+      },
+      "tags": {
+        "displayName": "Storage Account"
+      }
+    },
+    {
+      "name": "[variables('publicIpName')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic",
+        "dnsSettings": {
+          "domainNameLabel": "[concat(variables('vmName'))]"
+        }
+      },
+      "tags": {
+        "displayName": "Public IP"
+      }
+    },
+    {
+      "name": "[variables('vnetName')]",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+      ],
+      "tags": {
+        "displayName": "VNet"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "subnet",
+            "properties": {
+              "addressPrefix": "[parameters('subnetPrefix')]"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('loadbalancerName')]",
+      "type": "Microsoft.Network/loadBalancers",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[concat('Microsoft.Network/publicIPAddresses/',variables('publicIpName'))]"
+      ],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "name": "LBFE",
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('publicIpName'))]"
+              }
+            }
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "LBBAP"
+          }
+        ],
+        "inboundNatRules": [
+          {
+            "name": "rdp",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('loadbalancerName')),'/frontendIPConfigurations/LBFE')]"
+              },
+              "protocol": "tcp",
+              "frontendPort": "[parameters('rdpPort')]",
+              "backendPort": 3389,
+              "enableFloatingIP": false
+            }
+          },
+          {
+            "name": "http",
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers',variables('loadbalancerName')),'/frontendIPConfigurations/LBFE')]"
+              },
+              "protocol": "tcp",
+              "frontendPort": 80,
+              "backendPort": 5555,
+              "enableFloatingIP": false
+            }
+          }
+        ]
+      },
+      "tags": {
+        "displayName": "Load Balancer"
+      }
+    },
+    {
+      "name": "[variables('nicName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[concat('Microsoft.Network/loadBalancers/', variables('loadbalancerName'))]"
+      ],
+      "properties": {
+
+        "ipConfigurations": [
+          {
+
+            "name": "ipconfig",
+
+            "properties": {
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), 'subnet')]"
+              },
+              "privateIPAllocationMethod": "Dynamic",
+              "loadBalancerBackendAddressPools": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadbalancerName')),'/backendAddressPools/LBBAP')]"
+                }
+              ],
+              "loadBalancerInboundNatRules": [
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadbalancerName')),'/inboundNatRules/rdp')]"
+                },
+                {
+                  "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadbalancerName')),'/inboundNatRules/http')]"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "tags": {
+        "displayName": "VM Nic"
+      }
+    },
+    {
+      "name": "[concat(variables('vmName'))]",
+      "type": "Microsoft.Compute/virtualMachines",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2015-06-15",
+      "dependsOn": [
+        "[concat('Microsoft.Storage/storageAccounts/', toLower(concat(parameters('vmName'))))]",
+        "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+      ],
+
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('vmVmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[concat(variables('vmName'))]",
+          "adminUsername": "[parameters('adminUserName')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('vmImagePublisher')]",
+            "offer": "[variables('vmImageOffer')]",
+            "sku": "[variables('vmImageSku')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "vmOSDisk",
+            "vhd": {
+              "uri": "[concat('http://', toLower(concat(parameters('vmName'))), '.blob.core.windows.net/', variables('vmStorageAccountContainerName'), '/', variables('vmOSDiskName'), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            }
+          ]
+        }
+      },
+      "tags": {
+        "displayName": "VM"
+      }
+    }
+    //{
+    //  "name": "[concat(variables('vmName'), '/dsc')]",
+    //  "type": "Microsoft.Compute/virtualMachines/extensions",
+    //  "apiVersion": "2015-06-15",
+    //  "location": "[resourceGroup().location]",
+    //  "dependsOn": [
+    //    "[concat('Microsoft.Compute/virtualMachines/' ,variables('vmName'))]"
+    //  ],
+    //  "properties": {
+    //    "publisher": "Microsoft.Powershell",
+    //    "type": "DSC",
+    //    "typeHandlerVersion": "2.19",
+    //    "settings": {
+    //      "wmfVersion": "latest",
+    //      "configuration": {
+    //        "url": "[concat(parameters('_artifactsLocation'), '/Avanade.CRM.Setup.IaaS/Configure-Server.ps1.zip')]",
+    //        "script": "Configure-Server.ps1",
+    //        "function": "CRM"
+    //      },
+    //      "configurationData": {
+    //        "url": "[concat(parameters('_artifactsLocation'), '/Avanade.CRM.Setup.IaaS/DSC/Configure-Server.configuration.psd1')]"
+    //      },
+    //      "configurationArguments": {
+    //        "configuration": "[parameters('configuration')]"
+    //      }
+    //    },
+    //    "protectedSettings": {
+    //      "configurationArguments": {
+    //        "installCredential": {
+    //          "UserName": "[parameters('storageAccountName')]",
+    //          "Password": "[parameters('storageAccountKey')]"
+    //        },
+    //        "adminCredential": {
+    //          "UserName": "[parameters('adminUserName')]",
+    //          "Password": "[parameters('adminPassword')]"
+    //        }
+    //      },
+    //      "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]",
+    //      "configurationDataUrlSasToken": "[parameters('_artifactsLocationSasToken')]"
+    //    }
+    //  }
+    //}
+  ],
+  "outputs": {
+  }
+}

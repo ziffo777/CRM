@@ -1,0 +1,141 @@
+﻿{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "_artifactsLocation": {
+      "type": "string"
+    },
+    "_artifactsLocationSasToken": {
+      "type": "securestring"
+    },
+    "storageType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_ZRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Premium_LRS"
+      ]
+    },
+    "vmName": {
+      "defaultValue": "msalmcrm",
+      "type": "string",
+      "minLength": 1
+    },
+
+    "adminUserName": {
+      "type": "string",
+      "defaultValue": "mnoskovic",
+      "minLength": 1
+    },
+    "adminPassword": {
+      "type": "securestring"
+    },
+
+    "vnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16"
+    },
+    "subnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/24"
+    },
+    "rdpPort": {
+      "type": "int",
+      "defaultValue": 443,
+      "metadata": {
+        "description": "Public port number for RDP"
+      }
+    },
+
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "storage account name for installation files"
+      }
+    },
+
+    "storageAccountKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "storage account key for accessing storage account"
+      }
+    },
+
+    "configuration": {
+      "type": "string",
+      "metadata": {
+        "description": "Configuration file content"
+      }
+    }
+  },
+  "variables": {
+
+    //"vmImagePublisher": "MicrosoftSQLServer",
+    //"vmImageOffer": "SQL2014SP1-WS2012R2",
+    //"vmImageSku": "Enterprise",
+
+    "vmImagePublisher": "MicrosoftWindowsServer",
+    "vmImageOffer": "WindowsServer",
+    "vmImageSku": "2012-R2-Datacenter",
+
+    "vmName": "[concat(parameters('vmName'))]",
+
+    "vmOSDiskName": "[concat(parameters('vmName'))]",
+    "vmVmSize": "Standard_A2",
+    "vmStorageAccountContainerName": "vhds",
+
+    "publicIpName": "[concat(parameters('vmName'),'-pip')]",
+    "loadbalancerName": "[concat(parameters('vmName'),'-lb')]",
+    "vnetName": "[concat(parameters('vmName'),'-vnet')]",
+    "nicName": "[concat(parameters('vmName'),'-nic')]",
+
+    "scriptFolder": "CRM/DSC",
+    "scriptFileName": "Configure-Server.ps1"
+
+  },
+  "resources": [
+    {
+      "name": "[concat(variables('vmName'), '/dsc')]",
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "dependsOn": [
+        
+      ],
+      "properties": {
+        "publisher": "Microsoft.Powershell",
+        "type": "DSC",
+        "typeHandlerVersion": "2.19",
+        "settings": {
+          "wmfVersion": "latest",
+          "configuration": {
+            "url": "[concat(parameters('_artifactsLocation'), '/Avanade.CRM.Setup.IaaS/Configure-Server-CRM.ps1.zip')]",
+            "script": "Configure-Server-CRM.ps1",
+            "function": "CRM"
+          },
+          "configurationData": {
+            "url": "[concat(parameters('_artifactsLocation'), '/Avanade.CRM.Setup.IaaS/DSC/Configure-Server.configuration.psd1')]"
+          },
+          "configurationArguments": {
+            "configuration": "[parameters('configuration')]"
+          }
+        },
+        "protectedSettings": {
+          "configurationArguments": {
+            "adminCredential": {
+              "UserName": "[parameters('adminUserName')]",
+              "Password": "[parameters('adminPassword')]"
+            }
+          },
+          "configurationUrlSasToken": "[parameters('_artifactsLocationSasToken')]",
+          "configurationDataUrlSasToken": "[parameters('_artifactsLocationSasToken')]"
+        }
+      }
+    }
+  ],
+  "outputs": {
+  }
+}

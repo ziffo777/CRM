@@ -1,0 +1,47 @@
+<CRMSetup>
+  <Server>
+    <InstallType>Configure</InstallType>
+    <Patch update="false"></Patch>
+    <SqlServer>localhost</SqlServer>
+    <Database create="true"/>
+    <Organization>CRM</Organization>
+    <OrganizationUniqueName>CRM</OrganizationUniqueName>
+    <OU>OU=CRM,DC=avanade,DC=com</OU>
+    <mu optin="true" />
+    <LicenseKey>X7CN4-CRQTW-FF48H-Q3GK4-JHWRF</LicenseKey>
+    <WebsiteUrl Create="true" port="5555"></WebsiteUrl>
+    <InstallDir>c:\program files\Microsoft Dynamics CRM</InstallDir>
+    <basecurrency isocurrencycode="EUR" currencyname="euro" currencysymbol="€" currencyprecision="2"/>
+    <OrganizationCollation>Latin1_General_CI_AI</OrganizationCollation>
+    
+    <CrmServiceAccount type="NetworkService">
+      
+    </CrmServiceAccount>
+    
+    <SandboxServiceAccount type="NetworkService">
+      
+    </SandboxServiceAccount>
+    
+    <DeploymentServiceAccount type="NetworkService">
+      
+    </DeploymentServiceAccount>
+    
+    <AsyncServiceAccount type="NetworkService">
+      
+    </AsyncServiceAccount>
+    
+    <VSSWriterServiceAccount type="NetworkService">
+      
+    </VSSWriterServiceAccount>
+    
+    <MonitoringServiceAccount type="NetworkService">
+      
+    </MonitoringServiceAccount>
+    
+    <SQM optin="false"/>
+    
+    <Reporting URL="http://localhost:80/ReportServer"/>
+    
+    <LaunchReportingExtensionsSetup>false</LaunchReportingExtensionsSetup>
+  </Server>
+</CRMSetup>
