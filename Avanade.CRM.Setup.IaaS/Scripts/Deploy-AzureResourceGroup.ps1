@@ -108,7 +108,11 @@ if ($UploadArtifacts) {
     $ArtifactStagingDirectory = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, $ArtifactStagingDirectory))
     $DSCSourceFolder = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, $DSCSourceFolder))
 
+	Write-Verbose -Verbose -Message "DCS MODULES INSTALLATION START"
+
 	. (Join-Path $PSScriptRoot 'Install-DscModules.ps1') -DscDirectory $DSCSourceFolder
+
+	Write-Verbose -Verbose -Message "DCS MODULES INSTALLED"
 
     Set-Variable ArtifactsLocationName '_artifactsLocation' -Option ReadOnly -Force
     Set-Variable ArtifactsLocationSasTokenName '_artifactsLocationSasToken' -Option ReadOnly -Force
